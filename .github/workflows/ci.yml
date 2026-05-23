@@ -14,11 +14,6 @@ concurrency:
 permissions:
   contents: read
 
-# The setup-uv cache is keyed off pyproject.toml because this is a library —
-# we deliberately don't check in a uv.lock (resolution is the consumer's job).
-env:
-  UV_CACHE_GLOB: pyproject.toml
-
 jobs:
   lint-and-type:
     name: Lint & type-check
@@ -30,23 +25,23 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: "latest"
-          enable-cache: true
-          cache-dependency-glob: ${{ env.UV_CACHE_GLOB }}
 
-      - name: Set up Python
-        run: uv python install 3.12
+      - name: Create venv (Python 3.12)
+        run: uv venv --python 3.12
 
       - name: Install project (dev extras)
-        run: uv pip install --system -e ".[dev]"
+        # No --system: PEP 668 makes Ubuntu's /usr Python externally managed,
+        # and a venv is the right place for CI deps anyway.
+        run: uv pip install -e ".[dev]"
 
       - name: Ruff (lint)
-        run: ruff check .
+        run: .venv/bin/ruff check .
 
       - name: Ruff (format check)
-        run: ruff format --check .
+        run: .venv/bin/ruff format --check .
 
       - name: mypy
-        run: mypy
+        run: .venv/bin/mypy
 
   test:
     name: Unit tests (Python ${{ matrix.python-version }})
@@ -62,18 +57,16 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: "latest"
-          enable-cache: true
-          cache-dependency-glob: ${{ env.UV_CACHE_GLOB }}
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      - name: Create venv (Python ${{ matrix.python-version }})
+        run: uv venv --python ${{ matrix.python-version }}
 
       - name: Install project (dev extras)
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Run unit tests
         # Default pytest excludes integration/live tests — see tests/conftest.py.
-        run: pytest
+        run: .venv/bin/pytest
 
   integration-mock:
     name: Integration tests (Prism mock)
@@ -90,24 +83,24 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: "latest"
-          enable-cache: true
-          cache-dependency-glob: ${{ env.UV_CACHE_GLOB }}
 
-      - name: Set up Python
-        run: uv python install 3.12
+      - name: Create venv (Python 3.12)
+        run: uv venv --python 3.12
 
       - name: Install project (dev extras)
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Install Prism mock server
-        run: npm install -g @stoplight/prism-cli@latest
+        # Pinned to 5.5.4: newer prism-cli has an ESM/CommonJS conflict with
+        # @faker-js/faker on Node 20+ (see stoplight/prism#2604).
+        run: npm install -g @stoplight/prism-cli@5.5.4
 
       - name: Start Prism on :4010
         run: |
           prism mock openapi/google-business-profile.yaml --port 4010 > prism.log 2>&1 &
           echo $! > prism.pid
-          # Wait for prism to bind (max ~20s).
-          for i in $(seq 1 40); do
+          # Wait for prism to bind (max ~30s).
+          for i in $(seq 1 60); do
             if curl -fsS -o /dev/null -H "Authorization: Bearer test" \
                 "http://localhost:4010/accounts"; then
               echo "prism is ready"
@@ -122,7 +115,7 @@ jobs:
       - name: Run integration tests against mock
         env:
           GBP_MOCK_BASE_URL: http://localhost:4010
-        run: pytest tests/integration --run-integration
+        run: .venv/bin/pytest tests/integration --run-integration -v
 
       - name: Stop Prism
         if: always()
