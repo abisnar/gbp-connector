@@ -153,9 +153,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Full history so gitleaks scans every commit, not just the diff.
           fetch-depth: 0
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install gitleaks
+        # Pinned binary (not the gitleaks-action wrapper, which has had checkout
+        # auth issues on public personal-account repos).
+        run: |
+          VERSION=8.18.4
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan repo and full history
+        run: gitleaks detect --source . --redact --verbose --no-banner --exit-code 1
