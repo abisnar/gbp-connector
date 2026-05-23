@@ -1,0 +1,303 @@
+openapi: 3.1.0
+info:
+  title: Google Business Profile API (subset)
+  version: "1.0.0"
+  summary: The upstream contract this connector relies on.
+  description: |
+    This OpenAPI document describes the **subset** of Google's Business Profile
+    APIs that `gbp-connector` calls. It is **not** an interface this library
+    exposes (the library is a Python SDK, not a server) — it pins the contract
+    we depend on so:
+
+      - changes upstream can be diffed against this spec
+      - integration tests can mock these endpoints from a single source of truth
+      - downstream consumers know exactly which scopes/permissions they need
+
+    Two Google services are described here:
+
+      - **Account Management** (`mybusinessaccountmanagement.googleapis.com`)
+        — listing accounts the OAuth user can manage.
+      - **Business Information** (`mybusinessbusinessinformation.googleapis.com`)
+        — reading and patching locations.
+
+    Both require OAuth 2.0 with the
+    `https://www.googleapis.com/auth/business.manage` scope and access
+    explicitly granted by Google (request via the Business Profile APIs form).
+  contact:
+    name: gbp-connector
+    url: https://github.com/abisnar/gbp-connector
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://mybusinessaccountmanagement.googleapis.com/v1
+    description: Account Management API
+  - url: https://mybusinessbusinessinformation.googleapis.com/v1
+    description: Business Information API
+
+security:
+  - googleOAuth: [businessManage]
+
+tags:
+  - name: accounts
+    description: Business Profile accounts (Account Management API)
+  - name: locations
+    description: Locations owned by an account (Business Information API)
+
+paths:
+  /accounts:
+    get:
+      tags: [accounts]
+      operationId: listAccounts
+      summary: List accounts accessible to the authenticated user.
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: A page of accounts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountsResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /accounts/{accountId}:
+    get:
+      tags: [accounts]
+      operationId: getAccount
+      summary: Get a single account by resource name.
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: The requested account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /accounts/{accountId}/locations:
+    get:
+      tags: [locations]
+      operationId: listLocations
+      summary: List locations under an account.
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - name: readMask
+          in: query
+          required: true
+          schema: { type: string }
+          description: Comma-separated FieldMask of Location fields to return.
+        - name: filter
+          in: query
+          required: false
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: A page of locations.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListLocationsResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /locations/{locationId}:
+    get:
+      tags: [locations]
+      operationId: getLocation
+      summary: Get a single location.
+      parameters:
+        - $ref: "#/components/parameters/LocationId"
+        - name: readMask
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The requested location.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Location" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      tags: [locations]
+      operationId: patchLocation
+      summary: Update specific fields on a location.
+      description: |
+        Only fields listed in `updateMask` are written. Anything else in the
+        request body is ignored. When `validateOnly=true`, the request is
+        checked without persisting.
+      parameters:
+        - $ref: "#/components/parameters/LocationId"
+        - name: updateMask
+          in: query
+          required: true
+          schema: { type: string }
+          description: Comma-separated FieldMask of Location fields to update.
+        - name: validateOnly
+          in: query
+          required: false
+          schema: { type: boolean }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Location" }
+      responses:
+        "200":
+          description: The updated location.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Location" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    googleOAuth:
+      type: oauth2
+      description: Standard Google OAuth 2.0.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://accounts.google.com/o/oauth2/v2/auth
+          tokenUrl: https://oauth2.googleapis.com/token
+          scopes:
+            businessManage: https://www.googleapis.com/auth/business.manage
+
+  parameters:
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string }
+      example: "1234567890"
+    LocationId:
+      name: locationId
+      in: path
+      required: true
+      schema: { type: string }
+      example: "9876543210"
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    PageToken:
+      name: pageToken
+      in: query
+      required: false
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Invalid request (e.g. updateMask field is unknown).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/GoogleApiError" }
+    Unauthorized:
+      description: Missing or invalid OAuth credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/GoogleApiError" }
+    NotFound:
+      description: Resource does not exist or is not accessible to the caller.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/GoogleApiError" }
+    RateLimited:
+      description: Quota exceeded — back off and retry with exponential jitter.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/GoogleApiError" }
+
+  schemas:
+    Account:
+      type: object
+      additionalProperties: true
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "accounts/1234567890"
+        accountName: { type: string }
+        type:
+          type: string
+          enum: [PERSONAL, LOCATION_GROUP, ORGANIZATION, USER_GROUP]
+        role:
+          type: string
+          enum: [OWNER, CO_OWNER, MANAGER, COMMUNITY_MANAGER, SITE_MANAGER]
+        verificationState: { type: string }
+
+    ListAccountsResponse:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/Account" }
+        nextPageToken: { type: string }
+
+    PostalAddress:
+      type: object
+      additionalProperties: true
+      properties:
+        regionCode: { type: string, example: "CA" }
+        postalCode: { type: string, example: "V6Y 1A1" }
+        administrativeArea: { type: string, example: "BC" }
+        locality: { type: string, example: "Richmond" }
+        addressLines:
+          type: array
+          items: { type: string }
+
+    Location:
+      type: object
+      additionalProperties: true
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "locations/9876543210"
+        title: { type: string }
+        storeCode: { type: string }
+        websiteUri: { type: string, format: uri }
+        phoneNumbers:
+          type: object
+          additionalProperties: { type: string }
+        storefrontAddress: { $ref: "#/components/schemas/PostalAddress" }
+        primaryCategory:
+          type: object
+          additionalProperties: { type: string }
+        labels:
+          type: array
+          items: { type: string }
+
+    ListLocationsResponse:
+      type: object
+      properties:
+        locations:
+          type: array
+          items: { $ref: "#/components/schemas/Location" }
+        nextPageToken: { type: string }
+        totalSize: { type: integer }
+
+    GoogleApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: integer }
+            message: { type: string }
+            status: { type: string }
+            details:
+              type: array
+              items: { type: object, additionalProperties: true }
