@@ -1,10 +1,12 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "gbp-connector"
-version = "0.1.0"
+# Version is derived from the most recent git tag (vX.Y.Z) by hatch-vcs.
+# See [tool.hatch.version] below and docs/releasing.md.
+dynamic = ["version"]
 description = "A SOLID Python client for the Google Business Profile API"
 readme = "README.md"
 license = { text = "MIT" }
@@ -41,8 +43,26 @@ Homepage = "https://github.com/abisnar/gbp-connector"
 Issues = "https://github.com/abisnar/gbp-connector/issues"
 "OpenAPI Spec" = "https://github.com/abisnar/gbp-connector/blob/main/openapi/google-business-profile.yaml"
 
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+# Generated file — gitignored. Imported by gbp_connector/__init__.py.
+version-file = "src/gbp_connector/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/gbp_connector"]
+
+[tool.hatch.build.targets.sdist]
+# Don't ship test/CI/dev clutter in the source distribution.
+exclude = [
+    "/.github",
+    "/tests",
+    "/examples",
+    "/docs",
+    "/.venv",
+    "/.coverage",
+]
 
 [tool.ruff]
 line-length = 100

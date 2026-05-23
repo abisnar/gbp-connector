@@ -48,3 +48,6 @@ coverage.xml
 
 # --- uv ---
 uv.lock
+
+# --- hatch-vcs generated ---
+src/gbp_connector/_version.py

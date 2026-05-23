@@ -32,7 +32,13 @@ from gbp_connector.http import HttpClient, HttpResponse, HttpxClient
 from gbp_connector.models import Account, Location
 from gbp_connector.resources import AccountsResource, LocationsResource
 
-__version__ = "0.1.0"
+try:
+    # _version.py is generated at build time by hatch-vcs (see pyproject.toml).
+    # When running from a non-built checkout it may not exist yet; fall back to
+    # a sentinel so imports never break.
+    from gbp_connector._version import __version__
+except ImportError:  # pragma: no cover — only hit on a raw source checkout
+    __version__ = "0.0.0+unknown"
 
 __all__ = [
     "Account",

@@ -4,7 +4,8 @@ A typed, dependency-injectable Python client for the
 [Google Business Profile](https://developers.google.com/my-business) API.
 
 [![CI](https://github.com/abisnar/gbp-connector/actions/workflows/ci.yml/badge.svg)](https://github.com/abisnar/gbp-connector/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![PyPI](https://img.shields.io/pypi/v/gbp-connector.svg)](https://pypi.org/project/gbp-connector/)
+[![Python](https://img.shields.io/pypi/pyversions/gbp-connector.svg)](https://pypi.org/project/gbp-connector/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ```python
@@ -38,7 +39,16 @@ pip install gbp-connector
 uv add gbp-connector
 ```
 
-Requires Python 3.11+.
+Pin to a specific version in production:
+
+```toml
+# pyproject.toml
+dependencies = ["gbp-connector==0.1.0"]
+```
+
+Requires Python 3.11+. Releases follow [SemVer](https://semver.org/) — see
+[docs/releasing.md](docs/releasing.md) for the version policy and release
+process.
 
 ## Configure
 
@@ -82,6 +92,7 @@ More:
 - [docs/architecture.md](docs/architecture.md) — how SOLID maps onto the layout
 - [docs/testing.md](docs/testing.md) — unit / mock / live test tiers and how to run them
 - [docs/oauth-setup.md](docs/oauth-setup.md) — one-time OAuth client + refresh-token setup
+- [docs/releasing.md](docs/releasing.md) — version policy + how releases reach PyPI
 - [examples/](examples/) — runnable scripts you can copy
 
 ## OpenAPI spec
