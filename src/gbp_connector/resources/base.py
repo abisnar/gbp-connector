@@ -53,17 +53,31 @@ class BaseResource:
         params: Mapping[str, Any] | None = None,
         page_size: int | None = None,
     ) -> Iterator[dict[str, Any]]:
-        """Yield items across all pages, transparently following ``nextPageToken``."""
+        """Yield items across all pages, transparently following ``nextPageToken``.
+
+        Raises:
+            GBPApiError: if the server returns the same ``nextPageToken`` twice
+                in a row. That always indicates a broken server (or a mock that
+                doesn't advance pages) and would otherwise loop forever.
+        """
         page_params: dict[str, Any] = dict(params or {})
         if page_size is not None:
             page_params["pageSize"] = page_size
 
+        previous_token: str | None = None
         while True:
             payload = self._request(method, path, params=page_params)
             yield from payload.get(items_key, []) or []
             next_token = payload.get("nextPageToken")
             if not next_token:
                 return
+            if next_token == previous_token:
+                raise GBPApiError(
+                    f"Server returned the same nextPageToken twice "
+                    f"({next_token!r}); refusing to loop.",
+                    status_code=502,
+                )
+            previous_token = next_token
             page_params["pageToken"] = next_token
 
 

@@ -14,6 +14,11 @@ concurrency:
 permissions:
   contents: read
 
+# The setup-uv cache is keyed off pyproject.toml because this is a library —
+# we deliberately don't check in a uv.lock (resolution is the consumer's job).
+env:
+  UV_CACHE_GLOB: pyproject.toml
+
 jobs:
   lint-and-type:
     name: Lint & type-check
@@ -26,6 +31,7 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: ${{ env.UV_CACHE_GLOB }}
 
       - name: Set up Python
         run: uv python install 3.12
@@ -43,7 +49,7 @@ jobs:
         run: mypy
 
   test:
-    name: Tests (Python ${{ matrix.python-version }})
+    name: Unit tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -57,6 +63,7 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: ${{ env.UV_CACHE_GLOB }}
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -64,8 +71,71 @@ jobs:
       - name: Install project (dev extras)
         run: uv pip install --system -e ".[dev]"
 
-      - name: Run pytest
+      - name: Run unit tests
+        # Default pytest excludes integration/live tests — see tests/conftest.py.
         run: pytest
+
+  integration-mock:
+    name: Integration tests (Prism mock)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: ${{ env.UV_CACHE_GLOB }}
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install project (dev extras)
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Install Prism mock server
+        run: npm install -g @stoplight/prism-cli@latest
+
+      - name: Start Prism on :4010
+        run: |
+          prism mock openapi/google-business-profile.yaml --port 4010 > prism.log 2>&1 &
+          echo $! > prism.pid
+          # Wait for prism to bind (max ~20s).
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null -H "Authorization: Bearer test" \
+                "http://localhost:4010/accounts"; then
+              echo "prism is ready"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "prism did not start in time" >&2
+          cat prism.log
+          exit 1
+
+      - name: Run integration tests against mock
+        env:
+          GBP_MOCK_BASE_URL: http://localhost:4010
+        run: pytest tests/integration --run-integration
+
+      - name: Stop Prism
+        if: always()
+        run: |
+          if [ -f prism.pid ]; then kill "$(cat prism.pid)" || true; fi
+
+      - name: Upload Prism log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism-log
+          path: prism.log
+          if-no-files-found: ignore
 
   openapi:
     name: Validate OpenAPI spec

@@ -38,6 +38,16 @@ def test_accounts_list_iterates_pages(fake_auth: FakeAuth) -> None:
     assert http.calls[1].params == {"pageToken": "tok-2"}
 
 
+def test_paginate_raises_when_token_repeats(fake_auth: FakeAuth) -> None:
+    """A server stuck on the same nextPageToken would otherwise loop forever."""
+    stuck = json_response({"accounts": [{"name": "accounts/1"}], "nextPageToken": "stuck"})
+    http = FakeHttpClient(stuck)
+    resource = AccountsResource(auth=fake_auth, http=http, base_url="https://api.example/v1")
+
+    with pytest.raises(GBPApiError, match="same nextPageToken twice"):
+        list(resource.list())
+
+
 def test_accounts_list_sends_bearer_token(fake_auth: FakeAuth) -> None:
     http = FakeHttpClient(json_response({"accounts": []}))
     resource = AccountsResource(auth=fake_auth, http=http, base_url="https://api.example/v1")

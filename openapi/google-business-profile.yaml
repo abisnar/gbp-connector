@@ -149,7 +149,10 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/Location" }
+            # Partial Location — every field is optional; only those listed in
+            # updateMask are written. Modeled separately from the response
+            # Location, which requires ``name``.
+            schema: { $ref: "#/components/schemas/LocationUpdate" }
       responses:
         "200":
           description: The updated location.
@@ -245,6 +248,15 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Account" }
         nextPageToken: { type: string }
+      # Terminal-page example: no nextPageToken so mock servers (Prism) don't
+      # hand back a self-referencing token that traps paginating clients.
+      example:
+        accounts:
+          - name: "accounts/1234567890"
+            accountName: "Example Business"
+            type: "PERSONAL"
+            role: "OWNER"
+            verificationState: "VERIFIED"
 
     PostalAddress:
       type: object
@@ -255,6 +267,27 @@ components:
         administrativeArea: { type: string, example: "BC" }
         locality: { type: string, example: "Richmond" }
         addressLines:
+          type: array
+          items: { type: string }
+
+    LocationUpdate:
+      # Request body for PATCH /locations/{id}. All fields optional — the
+      # writable subset is declared in the ``updateMask`` query param, not
+      # by the body's shape.
+      type: object
+      additionalProperties: true
+      properties:
+        title: { type: string }
+        storeCode: { type: string }
+        websiteUri: { type: string, format: uri }
+        phoneNumbers:
+          type: object
+          additionalProperties: { type: string }
+        storefrontAddress: { $ref: "#/components/schemas/PostalAddress" }
+        primaryCategory:
+          type: object
+          additionalProperties: { type: string }
+        labels:
           type: array
           items: { type: string }
 
@@ -288,6 +321,24 @@ components:
           items: { $ref: "#/components/schemas/Location" }
         nextPageToken: { type: string }
         totalSize: { type: integer }
+      example:
+        locations:
+          - name: "locations/9876543210"
+            title: "Example Storefront"
+            storeCode: "EX-001"
+            websiteUri: "https://example.com"
+            phoneNumbers:
+              primaryPhone: "+1-604-555-0100"
+            storefrontAddress:
+              regionCode: "CA"
+              postalCode: "V6Y 1A1"
+              administrativeArea: "BC"
+              locality: "Richmond"
+              addressLines: ["1234 Example St"]
+            primaryCategory:
+              displayName: "Dentist"
+            labels: ["primary-location"]
+        totalSize: 1
 
     GoogleApiError:
       type: object

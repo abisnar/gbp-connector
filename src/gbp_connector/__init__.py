@@ -17,7 +17,7 @@ The package is organized around three replaceable abstractions:
 Swap any of them via constructor injection to test, mock, or extend.
 """
 
-from gbp_connector.auth import AuthProvider, OAuth2RefreshTokenProvider
+from gbp_connector.auth import AuthProvider, OAuth2RefreshTokenProvider, StaticTokenProvider
 from gbp_connector.config import ConnectorConfig
 from gbp_connector.connector import GoogleBusinessProfileConnector
 from gbp_connector.exceptions import (
@@ -52,5 +52,6 @@ __all__ = [
     "NotFoundError",
     "OAuth2RefreshTokenProvider",
     "RateLimitError",
+    "StaticTokenProvider",
     "__version__",
 ]

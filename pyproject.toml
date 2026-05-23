@@ -80,3 +80,7 @@ disallow_untyped_defs = false
 minversion = "8.0"
 addopts = "-ra --strict-markers --cov=gbp_connector --cov-report=term-missing"
 testpaths = ["tests"]
+markers = [
+    "integration: hits an HTTP server (real or mocked); needs --run-integration to run",
+    "live: hits real Google APIs with credentials from the environment; needs --run-live",
+]

@@ -1,8 +1,18 @@
-"""Shared test fixtures.
+"""Shared test fixtures and CLI gates.
 
-Tests depend on the public protocols (``AuthProvider``, ``HttpClient``), never
-on the concrete httpx/OAuth implementations, so the whole suite runs offline
-and finishes in well under a second.
+Unit tests depend only on the public protocols (``AuthProvider``,
+``HttpClient``), never on the concrete httpx/OAuth implementations, so the
+unit suite runs offline and finishes in well under a second.
+
+Integration tests (``tests/integration/``) are gated behind explicit pytest
+flags so they never run by accident:
+
+  - ``--run-integration`` enables tests marked ``integration`` (e.g. those
+    that hit a Prism mock server).
+  - ``--run-live``        enables tests marked ``live`` (real Google APIs,
+    real OAuth credentials from env).
+
+The default ``pytest`` invocation runs the unit suite only.
 """
 
 from __future__ import annotations
@@ -15,6 +25,43 @@ import pytest
 
 from gbp_connector.config import ConnectorConfig
 from gbp_connector.http.base import HttpResponse
+
+# --- CLI gates for integration / live tests ---------------------------------
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-integration",
+        action="store_true",
+        default=False,
+        help="Run tests marked 'integration' (e.g. Prism mock server).",
+    )
+    parser.addoption(
+        "--run-live",
+        action="store_true",
+        default=False,
+        help="Run tests marked 'live' (real Google APIs; needs GBP_* env vars).",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    # Use ``get_closest_marker`` rather than ``"x" in item.keywords`` — the
+    # latter also matches directory and filename components (e.g. anything
+    # under ``tests/integration/`` would always match "integration").
+    run_integration = config.getoption("--run-integration")
+    run_live = config.getoption("--run-live")
+
+    skip_integration = pytest.mark.skip(reason="needs --run-integration to run")
+    skip_live = pytest.mark.skip(reason="needs --run-live (and GBP_* env vars) to run")
+
+    for item in items:
+        if item.get_closest_marker("integration") is not None and not run_integration:
+            item.add_marker(skip_integration)
+        if item.get_closest_marker("live") is not None and not run_live:
+            item.add_marker(skip_live)
+
+
+# --- Unit-test doubles ------------------------------------------------------
 
 
 @dataclass

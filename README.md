@@ -76,7 +76,13 @@ connector = GoogleBusinessProfileConnector(
 )
 ```
 
-See [docs/architecture.md](docs/architecture.md) for how SOLID maps onto the layout.
+More:
+
+- [docs/usage.md](docs/usage.md) — runnable recipes (list, get, patch, custom auth/http, error handling)
+- [docs/architecture.md](docs/architecture.md) — how SOLID maps onto the layout
+- [docs/testing.md](docs/testing.md) — unit / mock / live test tiers and how to run them
+- [docs/oauth-setup.md](docs/oauth-setup.md) — one-time OAuth client + refresh-token setup
+- [examples/](examples/) — runnable scripts you can copy
 
 ## OpenAPI spec
 
@@ -98,19 +104,25 @@ mypy
 pytest
 ```
 
-Tests run fully offline against `FakeHttpClient` / `FakeAuth`; the full suite
-finishes in well under a second.
+The default `pytest` invocation is offline-only against `FakeHttpClient` /
+`FakeAuth`; the unit suite finishes in well under a second. Integration and
+live tests are opt-in — see [docs/testing.md](docs/testing.md) and
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CI
 
-`.github/workflows/ci.yml` runs four jobs on every push and PR:
+`.github/workflows/ci.yml` runs these jobs on every push and PR:
 
-| Job          | What it does                                                 |
-|--------------|--------------------------------------------------------------|
-| lint-and-type| `ruff check`, `ruff format --check`, `mypy --strict`         |
-| test         | `pytest` across Python 3.11 / 3.12 / 3.13                    |
-| openapi      | `redocly lint` on `openapi/google-business-profile.yaml`     |
-| secret-scan  | `gitleaks` over the full history                             |
+| Job              | What it does                                                            |
+|------------------|-------------------------------------------------------------------------|
+| lint-and-type    | `ruff check`, `ruff format --check`, `mypy --strict`                    |
+| test             | `pytest` unit suite across Python 3.11 / 3.12 / 3.13                    |
+| integration-mock | Boots `prism mock` from the OpenAPI spec, runs integration tests        |
+| openapi          | `redocly lint` on `openapi/google-business-profile.yaml`                |
+| secret-scan      | `gitleaks` over the full history                                        |
+
+Live tests against real Google APIs are **not** run in CI — they need real
+credentials. Run them locally per [docs/testing.md](docs/testing.md).
 
 ## License
 
